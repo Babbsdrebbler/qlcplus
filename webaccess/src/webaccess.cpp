@@ -153,6 +153,37 @@ QString WebAccess::loadXMLPost(mg_connection *conn, QString &filename)
 
 bool WebAccess::sendFile(mg_connection *conn, QString filename, QString contentType)
 {
+    for(int i = 0; i < conn->num_headers; i++)
+    {
+        if(strcmp(conn->http_headers[i].name , "If-Modified-Since") == 0)
+        {
+            QString lastModifiedString(conn->http_headers[i].value);
+            
+            //Images are ressources, no check needed
+            if(contentType!="image/png")
+            {
+                QFileInfo fileInfo(filename);
+                QDateTime lastModified = QDateTime::fromString(lastModifiedString.remove("GMT"), QString("ddd, dd MMM yyyy hh:mm:ss"));
+                
+                //If it was modified, send new version
+                if(lastModified.secsTo(fileInfo.lastModified()) > 0)
+                {
+                    break;
+                }
+            }
+            
+            QString head = "HTTP/1.1 304 Not Modified\r\n";
+            head += "Content-Type: " + contentType + "\r\n";
+            head += "Content-Length: %d\r\n";
+            head += "Last-modified: "+lastModifiedString+" GMT\r\n";
+            head += "Cache-Control: public, max-age=3600\r\n\r\n";
+            mg_printf(conn, head.toLatin1().data(),
+                      0);
+            return true;
+            
+        }
+    }
+
     QFile resFile(filename);
     if (resFile.open(QIODevice::ReadOnly))
     {
@@ -161,7 +192,9 @@ bool WebAccess::sendFile(mg_connection *conn, QString filename, QString contentT
         resFile.close();
         QString head = "HTTP/1.1 200 OK\r\n";
         head += "Content-Type: " + contentType + "\r\n";
-        head += "Content-Length: %d\r\n\r\n";
+        head += "Content-Length: %d\r\n";
+        head += "Last-modified: "+QDateTime::currentDateTimeUtc().toString(QString("ddd, dd MMM yyyy hh:mm:ss"))+" GMT\r\n";
+        head += "Cache-Control: public, max-age=3600\r\n\r\n";
         mg_printf(conn, head.toLatin1().data(),
                   resContent.length());
         mg_write(conn, resContent.data(), resContent.length());
@@ -1111,8 +1144,7 @@ QString WebAccess::getVCHTML()
     m_CSScode = "<link href=\"common.css\" rel=\"stylesheet\" type=\"text/css\" media=\"screen\">\n";
     m_CSScode += "<link href=\"virtualconsole.css\" rel=\"stylesheet\" type=\"text/css\" media=\"screen\">\n";
     m_JScode = "<script type=\"text/javascript\" src=\"websocket.js\"></script>\n"
-               "<script type=\"text/javascript\" src=\"virtualconsole.js\"></script>\n"
-               "<script type=\"text/javascript\">\n";
+               "<script type=\"text/javascript\" src=\"virtualconsole.js\"></script>\n";
 
     VCFrame *mainFrame = m_vc->contents();
     QSize mfSize = mainFrame->size();
@@ -1139,8 +1171,6 @@ QString WebAccess::getVCHTML()
             "background-color: " + mainFrame->backgroundColor().name() + ";\">\n";
 
     widgetsHTML += getChildrenHTML(mainFrame, 0, 0);
-
-    m_JScode += "\n</script>\n";
 
     QString str = HTML_HEADER + m_CSScode + m_JScode + "</head>\n<body>\n" + widgetsHTML + "</div>\n</body>\n</html>";
     return str;
