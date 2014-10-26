@@ -3,8 +3,9 @@
 
 #define HTML_HEADER \
 	"<!DOCTYPE html>\n" \
-    "<head>\n<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\" >\n" \
-	"<title>QLC+ Webaccess</title>\n"
+        "<head>\n<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\" >\n" \
+	"<title>QLC+ Webaccess</title>\n"\
+        "<link rel=\"icon\" type=\"image/png\" href=\"qlcplus.png\" />\n"
 
 #define PROJECT_LOADED_JS \
     "var websocket;\n" \
